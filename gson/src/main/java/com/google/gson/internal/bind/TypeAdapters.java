@@ -729,11 +729,11 @@ public final class TypeAdapters {
             nameToConstant.put(fieldName, constant);
             constantToName.put(constant, fieldName);
           } else {
-            String[] names = annotation.value();
+            SerializedNameValue names = new SerializedNameValue(annotation.value(), annotation.alternate());
             for (String name : names) {
               nameToConstant.put(name, constant);
             }
-            constantToName.put(constant, names[0]); // Only use the first value to serialize
+            constantToName.put(constant, names.getDefaultName()); // Only use the first value to serialize
           }
         }
       } catch (NoSuchFieldException e) {

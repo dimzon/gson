@@ -63,13 +63,19 @@ public final class ReflectiveTypeAdapterFactory implements TypeAdapterFactory {
     return !excluder.excludeClass(f.getType(), serialize) && !excluder.excludeField(f, serialize);
   }
 
-  private String[] getFieldName(Field f) {
+  private SerializedNameValue getFieldName(Field f) {
     return getFieldName(fieldNamingPolicy, f);
   }
 
-  static String[] getFieldName(FieldNamingStrategy fieldNamingPolicy, Field f) {
+  static SerializedNameValue getFieldName(FieldNamingStrategy fieldNamingPolicy, Field f) {
     SerializedName serializedName = f.getAnnotation(SerializedName.class);
-    return serializedName == null ? new String[]{fieldNamingPolicy.translateName(f)} : serializedName.value();
+    SerializedNameValue fieldName;
+    if (serializedName == null) {
+      fieldName = new SerializedNameValue(fieldNamingPolicy.translateName(f), null);
+    } else {
+      fieldName = new SerializedNameValue(serializedName.value(), serializedName.alternate());
+    }
+    return fieldName;
   }
 
   public <T> TypeAdapter<T> create(Gson gson, final TypeToken<T> type) {
@@ -84,13 +90,13 @@ public final class ReflectiveTypeAdapterFactory implements TypeAdapterFactory {
   }
 
   private ReflectiveTypeAdapterFactory.BoundField[] createBoundField(
-      final Gson context, final Field field, final String[] names,
+      final Gson context, final Field field, final SerializedNameValue names,
       final TypeToken<?> fieldType, boolean serialize, boolean deserialize) {
     final boolean isPrimitive = Primitives.isPrimitive(fieldType.getRawType());
     // special casing primitives here saves ~5% on Android...
-    ReflectiveTypeAdapterFactory.BoundField[] boundFields = new ReflectiveTypeAdapterFactory.BoundField[names.length];
-    for (int i = 0; i < names.length; ++i) {
-      String name = names[i];
+    ReflectiveTypeAdapterFactory.BoundField[] boundFields = new ReflectiveTypeAdapterFactory.BoundField[names.size()];
+    for (int i = 0; i < names.size(); ++i) {
+      String name = names.get(i);
       boundFields[i] = new ReflectiveTypeAdapterFactory.BoundField(name, serialize, deserialize) {
         final TypeAdapter<?> typeAdapter = getFieldAdapter(context, field, fieldType);
         @SuppressWarnings({"unchecked", "rawtypes"}) // the type adapter and field type always agree

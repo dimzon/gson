@@ -35,7 +35,7 @@ import java.lang.annotation.Target;
  * <pre>
  * public class MyClass {
  *   &#64SerializedName("name") String a;
- *   &#64SerializedName({"name1", "name2"}) String b;
+ *   &#64SerializedName(value="name1", alternate={"name2", "name3"}) String b;
  *   String c;
  *
  *   public MyClass(String a, String b, String c) {
@@ -66,8 +66,10 @@ import java.lang.annotation.Target;
  *   assertEquals("v1", target.b);
  *   target = gson.fromJson("{'name2':'v2'}", MyClass.class);
  *   assertEquals("v2", target.b);
+ *   target = gson.fromJson("{'name3':'v3'}", MyClass.class);
+ *   assertEquals("v3", target.b);
  * </pre>
- * Note that MyClass.b is now deserialized from either name1 or name2.
+ * Note that MyClass.b is now deserialized from either name1, name2 or name3.
  *
  * @see com.google.gson.FieldNamingPolicy
  *
@@ -82,5 +84,6 @@ public @interface SerializedName {
    * @return the desired names of the field when it is deserialized or serialized. All of the specified names will be deserialized from.
    *   The specified first name is what is used for serialization.
    */
-  String[] value();
+  String value();
+  String[] alternate() default {};
 }
