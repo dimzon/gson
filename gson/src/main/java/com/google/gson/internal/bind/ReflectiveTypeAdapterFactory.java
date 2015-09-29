@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Type;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 
 import com.google.gson.FieldNamingStrategy;
@@ -64,19 +66,24 @@ public final class ReflectiveTypeAdapterFactory implements TypeAdapterFactory {
     return !excluder.excludeClass(f.getType(), serialize) && !excluder.excludeField(f, serialize);
   }
 
-  private SerializedNameValue getFieldName(Field f) {
+  /** first element holds the default name */
+  private List<String> getFieldNames(Field f) {
     return getFieldName(fieldNamingPolicy, f);
   }
 
-  static SerializedNameValue getFieldName(FieldNamingStrategy fieldNamingPolicy, Field f) {
+  /** first element holds the default name */
+  static List<String> getFieldName(FieldNamingStrategy fieldNamingPolicy, Field f) {
     SerializedName serializedName = f.getAnnotation(SerializedName.class);
-    SerializedNameValue fieldName;
+    List<String> fieldNames = new LinkedList<String>();
     if (serializedName == null) {
-      fieldName = new SerializedNameValue(fieldNamingPolicy.translateName(f), null);
+      fieldNames.add(fieldNamingPolicy.translateName(f));
     } else {
-      fieldName = new SerializedNameValue(serializedName.value(), serializedName.alternate());
+      fieldNames.add(serializedName.value());
+      for (String alternate : serializedName.alternate()) {
+        fieldNames.add(alternate);
+      }
     }
-    return fieldName;
+    return fieldNames;
   }
 
   public <T> TypeAdapter<T> create(Gson gson, final TypeToken<T> type) {
@@ -147,8 +154,8 @@ public final class ReflectiveTypeAdapterFactory implements TypeAdapterFactory {
         }
         field.setAccessible(true);
         Type fieldType = $Gson$Types.resolve(type.getType(), raw, field.getGenericType());
-        SerializedNameValue fieldNames = getFieldName(field);
-        BoundField boundField = createBoundField(context, field, fieldNames.getDefaultName(),
+        List<String> fieldNames = getFieldNames(field);
+        BoundField boundField = createBoundField(context, field, fieldNames.get(0),
             TypeToken.get(fieldType), serialize, deserialize);
         BoundField previous = null;
         for (String name : fieldNames) {
