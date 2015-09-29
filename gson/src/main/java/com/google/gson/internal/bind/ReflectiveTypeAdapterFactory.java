@@ -109,7 +109,7 @@ public final class ReflectiveTypeAdapterFactory implements TypeAdapterFactory {
           throws IOException, IllegalAccessException {
         Object fieldValue = field.get(value);
         TypeAdapter t =
-            new TypeAdapterRuntimeTypeWrapper(context, this.typeAdapter, fieldType.getType());
+          new TypeAdapterRuntimeTypeWrapper(context, this.typeAdapter, fieldType.getType());
         t.write(writer, fieldValue);
       }
       @Override void read(JsonReader reader, Object value)

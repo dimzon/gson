@@ -723,19 +723,16 @@ public final class TypeAdapters {
     public EnumTypeAdapter(Class<T> classOfT) {
       try {
         for (T constant : classOfT.getEnumConstants()) {
-          String fieldName = constant.name();
-          SerializedName annotation = classOfT.getField(fieldName).getAnnotation(SerializedName.class);
-          if (annotation == null) {
-            nameToConstant.put(fieldName, constant);
-            constantToName.put(constant, fieldName);
-          } else {
-            String defaultName = annotation.value();
-            nameToConstant.put(defaultName, constant);
+          String name = constant.name();
+          SerializedName annotation = classOfT.getField(name).getAnnotation(SerializedName.class);
+          if (annotation != null) {
+            name = annotation.value();
             for (String alternate : annotation.alternate()) {
               nameToConstant.put(alternate, constant);
             }
-            constantToName.put(constant, defaultName); // Only use the default value to serialize
           }
+          nameToConstant.put(name, constant);
+          constantToName.put(constant, name);
         }
       } catch (NoSuchFieldException e) {
         throw new AssertionError();
