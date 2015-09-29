@@ -25,7 +25,11 @@ public final class SerializedNameTest extends TestCase {
 
   public void testFirstNameIsChosenForSerialization() {
     MyClass target = new MyClass("v1", "v2");
-    assertTrue(gson.toJson(target).contains("\"name1\":\"v2\""));
+    String json = gson.toJson(target);
+    assertTrue(json.contains("\"name1\":\"v2\""));
+    assertEquals(2, json.split("name1").length); // Ensure name1 occurs exactly once
+    assertFalse(json.contains("name2"));
+    assertFalse(json.contains("name3"));
   }
 
   public void testMultipleNamesDeserializedCorrectly() {

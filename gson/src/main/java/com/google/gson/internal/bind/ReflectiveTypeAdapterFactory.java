@@ -16,6 +16,14 @@
 
 package com.google.gson.internal.bind;
 
+import static com.google.gson.internal.bind.JsonAdapterAnnotationTypeAdapterFactory.getTypeAdapter;
+
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Type;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import com.google.gson.FieldNamingStrategy;
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
@@ -32,13 +40,6 @@ import com.google.gson.reflect.TypeToken;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonToken;
 import com.google.gson.stream.JsonWriter;
-import java.io.IOException;
-import java.lang.reflect.Field;
-import java.lang.reflect.Type;
-import java.util.LinkedHashMap;
-import java.util.Map;
-
-import static com.google.gson.internal.bind.JsonAdapterAnnotationTypeAdapterFactory.getTypeAdapter;
 
 /**
  * Type adapter that reflects over the fields and methods of a class.
@@ -89,39 +90,35 @@ public final class ReflectiveTypeAdapterFactory implements TypeAdapterFactory {
     return new Adapter<T>(constructor, getBoundFields(gson, type, raw));
   }
 
-  private ReflectiveTypeAdapterFactory.BoundField[] createBoundField(
-      final Gson context, final Field field, final SerializedNameValue names,
+  private ReflectiveTypeAdapterFactory.BoundField createBoundField(
+      final Gson context, final Field field, final SerializedNameValue name,
       final TypeToken<?> fieldType, boolean serialize, boolean deserialize) {
     final boolean isPrimitive = Primitives.isPrimitive(fieldType.getRawType());
     // special casing primitives here saves ~5% on Android...
-    ReflectiveTypeAdapterFactory.BoundField[] boundFields = new ReflectiveTypeAdapterFactory.BoundField[names.size()];
-    for (int i = 0; i < names.size(); ++i) {
-      String name = names.get(i);
-      boundFields[i] = new ReflectiveTypeAdapterFactory.BoundField(name, serialize, deserialize) {
-        final TypeAdapter<?> typeAdapter = getFieldAdapter(context, field, fieldType);
-        @SuppressWarnings({"unchecked", "rawtypes"}) // the type adapter and field type always agree
-        @Override void write(JsonWriter writer, Object value)
-            throws IOException, IllegalAccessException {
-          Object fieldValue = field.get(value);
-          TypeAdapter t =
-              new TypeAdapterRuntimeTypeWrapper(context, this.typeAdapter, fieldType.getType());
-          t.write(writer, fieldValue);
+    ReflectiveTypeAdapterFactory.BoundField boundField = new ReflectiveTypeAdapterFactory.BoundField(name, serialize, deserialize) {
+      final TypeAdapter<?> typeAdapter = getFieldAdapter(context, field, fieldType);
+      @SuppressWarnings({"unchecked", "rawtypes"}) // the type adapter and field type always agree
+      @Override void write(JsonWriter writer, Object value)
+          throws IOException, IllegalAccessException {
+        Object fieldValue = field.get(value);
+        TypeAdapter t =
+            new TypeAdapterRuntimeTypeWrapper(context, this.typeAdapter, fieldType.getType());
+        t.write(writer, fieldValue);
+      }
+      @Override void read(JsonReader reader, Object value)
+          throws IOException, IllegalAccessException {
+        Object fieldValue = typeAdapter.read(reader);
+        if (fieldValue != null || !isPrimitive) {
+          field.set(value, fieldValue);
         }
-        @Override void read(JsonReader reader, Object value)
-            throws IOException, IllegalAccessException {
-          Object fieldValue = typeAdapter.read(reader);
-          if (fieldValue != null || !isPrimitive) {
-            field.set(value, fieldValue);
-          }
-        }
-        public boolean writeField(Object value) throws IOException, IllegalAccessException {
-          if (!serialized) return false;
-          Object fieldValue = field.get(value);
-          return fieldValue != value; // avoid recursion for example for Throwable.cause
-        }
-      };
-    }
-    return boundFields;
+      }
+      public boolean writeField(Object value) throws IOException, IllegalAccessException {
+        if (!serialized) return false;
+        Object fieldValue = field.get(value);
+        return fieldValue != value; // avoid recursion for example for Throwable.cause
+      }
+    };
+    return boundField;
   }
 
   private TypeAdapter<?> getFieldAdapter(Gson gson, Field field, TypeToken<?> fieldType) {
@@ -150,11 +147,11 @@ public final class ReflectiveTypeAdapterFactory implements TypeAdapterFactory {
         }
         field.setAccessible(true);
         Type fieldType = $Gson$Types.resolve(type.getType(), raw, field.getGenericType());
-        BoundField[] boundFields = createBoundField(context, field, getFieldName(field),
+        BoundField boundField = createBoundField(context, field, getFieldName(field),
             TypeToken.get(fieldType), serialize, deserialize);
         BoundField previous = null;
-        for (BoundField boundField : boundFields) {
-          BoundField replaced = result.put(boundField.name, boundField);
+        for (String name : boundField.name) {
+          BoundField replaced = result.put(name, boundField);
           if (previous == null) previous = replaced;
         }
         if (previous != null) {
@@ -169,11 +166,11 @@ public final class ReflectiveTypeAdapterFactory implements TypeAdapterFactory {
   }
 
   static abstract class BoundField {
-    final String name;
+    final SerializedNameValue name;
     final boolean serialized;
     final boolean deserialized;
 
-    protected BoundField(String name, boolean serialized, boolean deserialized) {
+    protected BoundField(SerializedNameValue name, boolean serialized, boolean deserialized) {
       this.name = name;
       this.serialized = serialized;
       this.deserialized = deserialized;
@@ -228,9 +225,12 @@ public final class ReflectiveTypeAdapterFactory implements TypeAdapterFactory {
 
       out.beginObject();
       try {
-        for (BoundField boundField : boundFields.values()) {
-          if (boundField.writeField(value)) {
-            out.name(boundField.name);
+        for (Map.Entry<String, BoundField> entry : boundFields.entrySet()) {
+          String name = entry.getKey();
+          BoundField boundField = entry.getValue();
+          String defaultName = boundField.name.getDefaultName();
+          if (name.equals(defaultName) && boundField.writeField(value)) {
+            out.name(defaultName);
             boundField.write(out, value);
           }
         }
