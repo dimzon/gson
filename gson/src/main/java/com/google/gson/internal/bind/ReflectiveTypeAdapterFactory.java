@@ -91,7 +91,7 @@ public final class ReflectiveTypeAdapterFactory implements TypeAdapterFactory {
   }
 
   private ReflectiveTypeAdapterFactory.BoundField createBoundField(
-      final Gson context, final Field field, final SerializedNameValue name,
+      final Gson context, final Field field, final String name,
       final TypeToken<?> fieldType, boolean serialize, boolean deserialize) {
     final boolean isPrimitive = Primitives.isPrimitive(fieldType.getRawType());
     // special casing primitives here saves ~5% on Android...
@@ -147,10 +147,11 @@ public final class ReflectiveTypeAdapterFactory implements TypeAdapterFactory {
         }
         field.setAccessible(true);
         Type fieldType = $Gson$Types.resolve(type.getType(), raw, field.getGenericType());
-        BoundField boundField = createBoundField(context, field, getFieldName(field),
+        SerializedNameValue fieldNames = getFieldName(field);
+        BoundField boundField = createBoundField(context, field, fieldNames.getDefaultName(),
             TypeToken.get(fieldType), serialize, deserialize);
         BoundField previous = null;
-        for (String name : boundField.name) {
+        for (String name : fieldNames) {
           BoundField replaced = result.put(name, boundField);
           if (previous == null) previous = replaced;
         }
@@ -166,11 +167,11 @@ public final class ReflectiveTypeAdapterFactory implements TypeAdapterFactory {
   }
 
   static abstract class BoundField {
-    final SerializedNameValue name;
+    final String name;
     final boolean serialized;
     final boolean deserialized;
 
-    protected BoundField(SerializedNameValue name, boolean serialized, boolean deserialized) {
+    protected BoundField(String name, boolean serialized, boolean deserialized) {
       this.name = name;
       this.serialized = serialized;
       this.deserialized = deserialized;
@@ -228,7 +229,7 @@ public final class ReflectiveTypeAdapterFactory implements TypeAdapterFactory {
         for (Map.Entry<String, BoundField> entry : boundFields.entrySet()) {
           String name = entry.getKey();
           BoundField boundField = entry.getValue();
-          String defaultName = boundField.name.getDefaultName();
+          String defaultName = boundField.name;
           if (name.equals(defaultName) && boundField.writeField(value)) {
             out.name(defaultName);
             boundField.write(out, value);
